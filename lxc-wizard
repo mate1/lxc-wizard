@@ -44,7 +44,7 @@ our $distrib = 'squeeze';
 our( $container, $hostname, $domain, $fqdn, $ipaddr, $gwaddr );	# User provided information
 our( $vgname, $lvname, $lvsize, $mountpoint, $rootfs );
 our( $memory, $swap, $cpushares, $ioweight, $autostart, $launch );
-our( $rootpass );
+our( $rootpass, @users );
 our( $postcreate );
 
 my( $LVM, $MOUNT, $FSTAB, $CREATE );	 # Features to manage
@@ -65,6 +65,7 @@ GetOptions( 'help'		=> \$help,
 		  'postcreate=s' => \$postcreate,
 
 		  'rootpass=s' => \$rootpass,
+		  'user=s' => \@users,
 
 	    'autostart=s'	=> \$autostart,
 	    'launch=s'		=> \$launch,
@@ -97,13 +98,18 @@ sub help
     print <<EOH;
 Usage: $0 [options]
 
-    --fqdn DQDN		full qualified domain name of the target container
-    --hostname HOST	hostname (if it can't be extracted from the fqdn)
-    --domain DOMAIN	domain name (if it can't be extracted from the fqdn)
-    --ipaddr IPADDR	ip address (if it can't be found by gethost call)
-    --gwaddr IPADDR	gateway address
+    --fqdn DQDN     full qualified domain name of the target container
+    --hostname HOST hostname (if it can't be extracted from the fqdn)
+    --domain DOMAIN domain name (if it can't be extracted from the fqdn)
+    --ipaddr IPADDR ip address (if it can't be found by gethost call)
+    --gwaddr IPADDR gateway address
 
-    blah blah blah rtfsck
+    --rootpass      the root password to set
+    --user          user to add in the format user:pass
+                    (can be passed multiple times)
+
+    --postcreate    script to copy into the container and run
+                    after the container is created.
 EOH
 }
 
@@ -319,7 +325,7 @@ if( $CREATE eq 'Y' )
     print CONFIG  lxc_config();
     close CONFIG;
 
-		if( -f $postcreate )
+		if( $postcreate && -f $postcreate )
 		{
 			print "Running post create script...";
 			copy($postcreate, $rootfs);
@@ -335,6 +341,18 @@ if( $CREATE eq 'Y' )
 			print PASS "root:$rootpass\n";
 			close(PASS);
 			# TODO: we should check if the above succeeded
+		}
+
+		if( @users ) {
+			foreach my $userpass (@users) {
+				if ($userpass =~ /(.+):(.+)/) {
+					my $user = $1;
+					my $pass = $2;
+					print "Adding user $user...";
+					$rc = not system("chroot $rootfs useradd $user --create-home --shell /bin/bash --password " . crypt($pass, "aa"));
+					checkrc($rc);
+				}
+			}					
 		}
 }
 
