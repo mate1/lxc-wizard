@@ -9,6 +9,9 @@
 use strict;
 use Socket;
 use Getopt::Long;
+use File::Path;
+use File::Copy;
+use File::Basename;
 
 # Unused
 my $DEBUG = 0;
@@ -41,6 +44,7 @@ our $distrib = 'squeeze';
 our( $container, $hostname, $domain, $fqdn, $ipaddr, $gwaddr );	# User provided information
 our( $vgname, $lvname, $lvsize, $mountpoint, $rootfs );
 our( $memory, $swap, $cpushares, $ioweight, $autostart, $launch );
+our( $postcreate );
 
 my( $LVM, $MOUNT, $FSTAB, $CREATE );	 # Features to manage
 my( $confirm, $AUTO, $BUILD, $REFRESH ); # Local use only
@@ -57,6 +61,7 @@ GetOptions( 'help'		=> \$help,
 	    'lvname=s'		=> \$lvname,
 	    'lvsize=s'		=> \$lvsize,
 	    'mountpoint=s'	=> \$mountpoint,
+		  'post-create=s' => \$postcreate,
 
 	    'autostart=s'	=> \$autostart,
 	    'launch=s'		=> \$launch,
@@ -263,7 +268,7 @@ if( $LVM eq 'Y' )
     checkrc( $rc );
 
     print "Creating Mount Point... ";
-    $rc = mkdir $mountpoint;
+    $rc = mkpath $mountpoint;
     checkrc( $rc );
 
     print "Mounting Filesystem... ";
@@ -279,7 +284,7 @@ if( $LVM eq 'Y' )
 else
 {
     print "Creating target directory... ";
-    $rc = not system( "mkdir -p $mountpoint" );
+    $rc = mkpath $mountpoint;
     checkrc( $rc );
 }
 
@@ -308,6 +313,16 @@ if( $CREATE eq 'Y' )
     open  CONFIG, ">$mountpoint/config";
     print CONFIG  lxc_config();
     close CONFIG;
+
+		if( -f $postcreate )
+		{
+			print "Running post create script...";
+			copy($postcreate, $rootfs);
+			my $pc = basename($postcreate);
+			$rc = not system("chmod +x $rootfs/$pc && chroot $rootfs /$pc");
+			# TODO: delete postcreate from the container
+			checkrc( $rc );
+		}
 }
 
 if( $launch eq 'Y' )
@@ -409,8 +424,9 @@ sub checkrc
 
 sub build_cache
 {
-    my $partial = "/var/cache/lxc/partial-$distrib-$arch";
-    my $cache = "/var/cache/lxc/rootfs-$distrib-$arch";
+	  my $lxc = "/var/lib/lxc";
+    my $partial = "$lxc/partial-$distrib-$arch";
+    my $cache = "$lxc/rootfs-$distrib-$arch";
 
     my $mirror = 'http://mirror.peer1.net/debian';
 
@@ -418,15 +434,14 @@ sub build_cache
 	. 'ifupdown,netbase,net-tools,iproute,inetutils-ping,'
 	. 'vim,openssh-server,debian-keyring';
 
-    die "Cache directory already exists; not overwriting\n"
-	if( -d $cache );
+    die "Cache directory already exists; not overwriting\n" if( -d $cache );
 
     print "Creating cache directory... ";
-    $rc = mkdir '/var/cache/lxc';
+    $rc = mkpath $lxc;
     checkrc( $rc );
 
     print "Creating download directory... ";
-    $rc = mkdir $partial;
+    $rc = mkpath $partial;
     checkrc( $rc );
 
     print "Downloading Debian minimal...\n";
