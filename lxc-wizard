@@ -325,7 +325,7 @@ if( $CREATE eq 'Y' )
 			copy($postcreate, $rootfs);
 			my $pc = basename($postcreate);
 			$rc = not system("chmod +x $rootfs/$pc && chroot $rootfs /$pc");
-			# TODO: delete postcreate from the container
+			unlink("$rootfs/$pc");
 			checkrc( $rc );
 		}
 		
