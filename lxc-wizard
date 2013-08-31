@@ -110,6 +110,9 @@ Usage: $0 [options]
 
     --postcreate    script to copy into the container and run
                     after the container is created.
+    
+    Anything passed at the end after -- will be passed along to the
+    post create script. For example: -- --cluster-id 1
 EOH
 }
 
@@ -330,7 +333,7 @@ if( $CREATE eq 'Y' )
 			print "Running post create script...";
 			copy($postcreate, $rootfs);
 			my $pc = basename($postcreate);
-			$rc = not system("chmod +x $rootfs/$pc && chroot $rootfs /$pc");
+			$rc = not system("chmod +x $rootfs/$pc && chroot $rootfs /$pc " . join(" ", @ARGV));
 			unlink("$rootfs/$pc");
 			checkrc( $rc );
 		}
@@ -455,7 +458,7 @@ sub checkrc
 
 sub build_cache
 {
-	  my $lxc = "/var/lib/lxc";
+	  my $lxc = "/var/cache/lxc";
     my $partial = "$lxc/partial-$distrib-$arch";
     my $cache = "$lxc/rootfs-$distrib-$arch";
 
@@ -534,11 +537,12 @@ EOF
 sub etc_sourceslist
 {
     return <<EOF;
-deb http://it.mate1/debian                      squeeze         main
-deb http://mirror.peer1.net/debian              squeeze         main
+deb http://it.mate1/debian                      squeeze main
+deb http://mirror.peer1.net/debian              squeeze main contrib non-free
 deb http://mirror.peer1.net/debian-security     squeeze/updates main
 deb http://mirror.peer1.net/debian              wheezy          main
 deb http://mirror.peer1.net/debian-security     wheezy/updates  main
+
 EOF
 }
 
