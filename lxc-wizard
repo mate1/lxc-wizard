@@ -44,6 +44,7 @@ our $distrib = 'squeeze';
 our( $container, $hostname, $domain, $fqdn, $ipaddr, $gwaddr );	# User provided information
 our( $vgname, $lvname, $lvsize, $mountpoint, $rootfs );
 our( $memory, $swap, $cpushares, $ioweight, $autostart, $launch );
+our( $rootpass );
 our( $postcreate );
 
 my( $LVM, $MOUNT, $FSTAB, $CREATE );	 # Features to manage
@@ -62,6 +63,8 @@ GetOptions( 'help'		=> \$help,
 	    'lvsize=s'		=> \$lvsize,
 	    'mountpoint=s'	=> \$mountpoint,
 		  'post-create=s' => \$postcreate,
+
+		  'rootpass=s' => \$rootpass,
 
 	    'autostart=s'	=> \$autostart,
 	    'launch=s'		=> \$launch,
@@ -235,6 +238,8 @@ do
     print "Volume Size:           $lvsize\n"	if $LVM eq 'Y';
     print "Mount Point:           $mountpoint\n" if $LVM eq 'Y';
     print "Dest Directory:        $mountpoint\n" if $LVM eq 'N';
+		print "\n"                                   if $rootpass;
+		print "Root Password:         changed\n"     if $rootpass;
     print "\n";
     print "Memory Limit:          $memory\n";
     print "Memory+Swap Limit:     $swap\n";
@@ -322,6 +327,14 @@ if( $CREATE eq 'Y' )
 			$rc = not system("chmod +x $rootfs/$pc && chroot $rootfs /$pc");
 			# TODO: delete postcreate from the container
 			checkrc( $rc );
+		}
+		
+		if( $rootpass )
+		{
+			open(PASS, "| chroot $rootfs /usr/sbin/chpasswd");
+			print PASS "root:$rootpass\n";
+			close(PASS);
+			# TODO: we should check if the above succeeded
 		}
 }
 
