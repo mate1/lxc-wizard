@@ -62,7 +62,7 @@ GetOptions( 'help'		=> \$help,
 	    'lvname=s'		=> \$lvname,
 	    'lvsize=s'		=> \$lvsize,
 	    'mountpoint=s'	=> \$mountpoint,
-		  'post-create=s' => \$postcreate,
+		  'postcreate=s' => \$postcreate,
 
 		  'rootpass=s' => \$rootpass,
 
