@@ -1,0 +1,200 @@
+#!/usr/bin/perl -w
+
+use strict;
+use warnings;
+use Storable 'dclone';
+use File::Basename;
+use File::Temp qw/ :POSIX /;
+use File::Slurp;
+
+# conjure is a wrapper around lxc-wizard that makes creating
+# complete environments via spell (definition) files quick
+# and pretty painless.
+
+# set to 0 to run for real
+my $DRYRUN = 0;
+
+# environment specific settings
+
+# required, deployment mode, or environment name
+my $DEPMODE = "";
+
+# required, the domain name that the environment's servers will have
+my $DOMAIN  = "";
+
+# required, the gateway address that the environment's servers will use
+my $GATEWAY = "";
+
+# location of the lxc-wizard, if you plan on ssh'ing
+# and doing a remote deploy without root then use sudo,
+# otherwise locally if you run as root or in sudo you
+# can remove it.
+my $WIZ = "sudo -- /home/hisham/bin/lxc-wizard";
+
+# if set then this user is used to ssh into
+# the host machines
+my $USER="root@";
+
+# ssh key that will be transfered to containers
+# more configuration follows to determine what
+# user accounts the key will go into
+my $KEY="/home/hisham/.ssh/id_rsa.pub";
+
+# where the profiles (postcreate) scripts are found.
+# for now there is a limitation that the scripts must
+# be on every host. we'll copy them over with us later.
+my $PROFILE_HOME = "/home/hisham/code/it/LXCWizard/profiles";
+
+# default settings that will be used for every container.
+my $DEFAULTS = {};
+
+# containers to create.
+# anything passed in here will override
+# the default options.
+my $CONTAINERS = {};
+
+die ("No spell specified or spell not found.") if (!defined($ARGV[0]) || ! -f $ARGV[0]);
+my $conf = read_file($ARGV[0]);
+eval $conf;
+
+for my $cname ( keys %$CONTAINERS ) {
+
+	my $options = dclone $DEFAULTS;
+	my $contoptions = $CONTAINERS->{$cname};
+	
+	foreach my $key ( keys $contoptions ) { $options->{$key} = $contoptions->{$key} };
+
+	wizard($options);
+
+}
+
+sub wizard {
+
+	my $options = shift;
+	my $conthost = $options->{containerhost};
+
+	# cleanups and sanity checks
+	$options->{container} = $options->{fqdn} if !$options->{container};
+
+	# if we're passed a "user" option, check if it's an array or 
+	# a scalar. if it's an array it should container user:pass entries
+	# otherwise it's a single user:pass entry.
+
+	my $users = "";
+
+	if ($options->{user}) {
+		if (ref($options->{user}) eq "ARRAY") {
+			for my $userpass (@{$options->{user}}) {
+				$users .= "--user $userpass " if ($userpass =~ /(.+):(.+)/);
+			}		
+		} elsif (ref($options->{user}) eq "") {
+			$users .= "--user " . $options->{user}. " ";
+		}
+	}
+
+	# if this is a remote deployment:
+	# copy over the postcreate script into a temporary directory on the host (if any)
+	# copy over keys to be pushed into users' home directories (if any)
+
+	my $remote = ($conthost !~ /(localhost)|(127\.0\.0\.1)/);
+	my $postcreate = "";
+	my $keys = "";
+
+	if ($remote) {
+
+		# copy over postcreate
+		$postcreate = "/tmp/" . $$ . "-" . basename($options->{profile});
+		system("scp $PROFILE_HOME/$options->{profile} $conthost:$postcreate");
+
+	} else {
+
+		# locally available postcreate
+		$postcreate = $options->{profile};
+
+		# locally available keys
+		if ($options->{key}) {
+			if (ref($options->{key}) eq "ARRAY") {
+				for my $userkey (@{$options->{key}}) {
+					$keys .= "--key $userkey " if ($userkey =~ /(.+):(.+)/);
+				}
+			} elsif (ref($options->{key}) eq "") {
+				$keys .= "--key " . $options->{key} . " ";
+			}
+		}
+	}
+
+	# handle ssh keys if any
+	if ($options->{key}) {
+	
+		if (ref($options->{key}) eq "ARRAY") {
+
+			# we're passed multiple keys
+			for my $userkey (@{$options->{key}}) {
+
+				if ($remote) {
+
+					# copy key over and change key file accordingly
+					my ($user, $keyfile) = split(/:/, $userkey);
+					my $key = tmpnam() . $$ . ".key";
+					system("scp $keyfile $conthost:$key");
+					$keys .= "--key $user:$key ";
+
+				} else {
+
+					# use locally available key
+					$keys .= "--key $userkey " if ($userkey =~ /(.+):(.+)/);
+				}
+			}
+
+		} elsif (ref($options->{key}) eq "") { # we're passed one key			
+
+			if ($remote) {
+
+				# copy key over and change key file accordingly
+				my $userkey = $options->{key};
+				my ($user, $keyfile) = split(/:/, $userkey);
+				my $key = tmpnam() . $$ . ".key";
+				system("scp $keyfile $conthost:$key");
+				$keys .= "--key $user:$key ";
+
+			} else {
+
+				# use locally available key
+				$keys .= "--key " . $options->{key} . " ";
+			}
+		}
+	}
+	
+	# generate the final command
+	my $cmd = <<EOF
+	ssh -t $USER$conthost -- $WIZ \\
+	--fqdn $options->{fqdn} \\
+	--ipaddr $options->{ipaddr} \\
+	--gwaddr $options->{gwaddr} \\
+	--cpushares=$options->{cpushares} \\
+	--ioweight=$options->{ioweight} \\
+	--memory=$options->{memory} \\
+	--container $options->{container} \\
+	--SWAP=$options->{SWAP} \\
+	--LVM=$options->{LVM} \\
+	--auto \\
+	--postcreate $postcreate \\
+	--rootpass $options->{rootpass} \\
+	$users \\
+	$keys \\
+	-- \\
+	--depmode $DEPMODE
+EOF
+	;
+
+	if ($DRYRUN) { print($cmd . "\n"); }
+	else { system($cmd); }
+
+	if ($options->{deployscript}) {
+		sleep 10; # wait for container to come up
+		print("Running deployscript...\n");
+		if ($DRYRUN) { print("-> " . $options->{deployscript} . "\n"); }
+		else { system("/bin/bash -c \"$options->{deployscript}\""); }
+	}
+}
+
