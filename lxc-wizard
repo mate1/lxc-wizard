@@ -44,7 +44,7 @@ our $distrib = 'squeeze';
 our( $container, $hostname, $domain, $fqdn, $ipaddr, $gwaddr );	# User provided information
 our( $vgname, $lvname, $lvsize, $mountpoint, $rootfs );
 our( $memory, $swap, $cpushares, $ioweight, $autostart, $launch );
-our( $rootpass, @users );
+our( $rootpass, @users, @keys );
 our( $postcreate );
 
 my( $LVM, $MOUNT, $FSTAB, $CREATE );	 # Features to manage
@@ -66,6 +66,7 @@ GetOptions( 'help'		=> \$help,
 
 		  'rootpass=s' => \$rootpass,
 		  'user=s' => \@users,
+		  'key=s' => \@keys,
 
 	    'autostart=s'	=> \$autostart,
 	    'launch=s'		=> \$launch,
@@ -106,6 +107,9 @@ Usage: $0 [options]
 
     --rootpass      the root password to set
     --user          user to add in the format user:pass
+                    (can be passed multiple times)
+    --key           add the key to given user, in the format
+                    user:/path/to/key
                     (can be passed multiple times)
 
     --postcreate    script to copy into the container and run
@@ -357,6 +361,32 @@ if( $CREATE eq 'Y' )
 				}
 			}					
 		}
+
+		if( @keys ) {
+			foreach my $userkey (@keys) {
+				if ($userkey =~ /(.+):(.+)/) {
+					my $user = $1;
+					my $key = $2;
+
+					# find user's info from /etc/passwd
+					open my $passwd, "$rootfs/etc/passwd";
+					print ("grepping for user $user in $rootfs/etc/passwd\n");
+					my @info = grep /$user/, <$passwd>;
+					close $passwd;
+
+					if (@info && scalar @info > 0) {
+
+						my ($login, $passwd, $uid, $gid, $gcos, $home, $shell) = split(/:/, $info[0]);
+
+						mkpath("$rootfs$home/.ssh");
+						system("chroot $rootfs /bin/bash -c 'chown -R $uid:$gid $home/.ssh'");
+						$rc = not system("cat $key >> $rootfs$home/.ssh/authorized_keys");
+						system("chroot $rootfs /bin/bash -c 'chmod 0600 $home/.ssh/authorized_keys'");
+						checkrc($rc);
+				}
+			}
+		}
+	}
 }
 
 if( $launch eq 'Y' )
