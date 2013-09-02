@@ -316,18 +316,27 @@ if( $CREATE eq 'Y' )
     $rc = not system( "cp -a /var/cache/lxc/rootfs-$distrib-$arch $rootfs" );
     checkrc( $rc );
 
+		# write hostname
     open  HOSTNAME, ">$rootfs/etc/hostname";
     print HOSTNAME  $hostname . "\n";
     close HOSTNAME;
+
+		# write ip / host / fqdn in /etc/hosts
+		open  HOST, ">>$rootfs/etc/hosts";		
+		print HOST "$ipaddr\t$hostname $fqdn";
+		close HOST;
     
+		# write network configuration
     open  INTERFACES, ">$rootfs/etc/network/interfaces";
     print INTERFACES  etc_interfaces();
     close INTERFACES;
 
+		# write resolve.conf
     open  RESOLVCONF, ">$rootfs/etc/resolv.conf";
     print RESOLVCONF  etc_resolvconf();
     close RESOLVCONF;
 
+		# write lxc configuration
     open  CONFIG, ">$mountpoint/config";
     print CONFIG  lxc_config();
     close CONFIG;
@@ -370,7 +379,6 @@ if( $CREATE eq 'Y' )
 
 					# find user's info from /etc/passwd
 					open my $passwd, "$rootfs/etc/passwd";
-					print ("grepping for user $user in $rootfs/etc/passwd\n");
 					my @info = grep /$user/, <$passwd>;
 					close $passwd;
 
@@ -379,8 +387,8 @@ if( $CREATE eq 'Y' )
 						my ($login, $passwd, $uid, $gid, $gcos, $home, $shell) = split(/:/, $info[0]);
 
 						mkpath("$rootfs$home/.ssh");
-						system("chroot $rootfs /bin/bash -c 'chown -R $uid:$gid $home/.ssh'");
 						$rc = not system("cat $key >> $rootfs$home/.ssh/authorized_keys");
+						system("chown -R $uid:$gid $rootfs$home/.ssh");
 						system("chroot $rootfs /bin/bash -c 'chmod 0600 $home/.ssh/authorized_keys'");
 						checkrc($rc);
 				}
