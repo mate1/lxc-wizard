@@ -51,16 +51,15 @@ my $DEFAULTS = {};
 # containers to create.
 # anything passed in here will override
 # the default options.
-my $CONTAINERS = {};
+my $CONTAINERS = [];
 
 die ("No spell specified or spell not found.") if (!defined($ARGV[0]) || ! -f $ARGV[0]);
 my $conf = read_file($ARGV[0]);
 eval $conf;
 
-for my $cname ( keys %$CONTAINERS ) {
+foreach my $contoptions (@$CONTAINERS) {
 
 	my $options = dclone $DEFAULTS;
-	my $contoptions = $CONTAINERS->{$cname};
 	
 	foreach my $key ( keys $contoptions ) { $options->{$key} = $contoptions->{$key} };
 
