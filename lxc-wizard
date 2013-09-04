@@ -340,16 +340,6 @@ if( $CREATE eq 'Y' )
     open  CONFIG, ">$mountpoint/config";
     print CONFIG  lxc_config();
     close CONFIG;
-
-		if( $postcreate && -f $postcreate )
-		{
-			print "Running post create script...";
-			copy($postcreate, $rootfs);
-			my $pc = basename($postcreate);
-			$rc = not system("chmod +x $rootfs/$pc && chroot $rootfs /$pc " . join(" ", @ARGV));
-			unlink("$rootfs/$pc");
-			checkrc( $rc );
-		}
 		
 		if( $rootpass )
 		{
@@ -359,6 +349,7 @@ if( $CREATE eq 'Y' )
 			# TODO: we should check if the above succeeded
 		}
 
+		# add users
 		if( @users ) {
 			foreach my $userpass (@users) {
 				if ($userpass =~ /(.+):(.+)/) {
@@ -371,6 +362,7 @@ if( $CREATE eq 'Y' )
 			}					
 		}
 
+		# deploy ssh keys
 		if( @keys ) {
 			foreach my $userkey (@keys) {
 				if ($userkey =~ /(.+):(.+)/) {
@@ -394,6 +386,17 @@ if( $CREATE eq 'Y' )
 				}
 			}
 		}
+	}
+
+	# run post create script if any
+	if( $postcreate && -f $postcreate )
+	{
+		print "Running post create script...";
+		copy($postcreate, $rootfs);
+		my $pc = basename($postcreate);
+		$rc = not system("chmod +x $rootfs/$pc && chroot $rootfs /$pc " . join(" ", @ARGV));
+		unlink("$rootfs/$pc");
+		checkrc( $rc );
 	}
 }
 
