@@ -11,6 +11,11 @@ use File::Slurp;
 # complete environments via spell (definition) files quick
 # and pretty painless.
 
+# TODO:
+# * ability to start, stop, and restart an environment
+# * ability to ping an environment to see what containers are up
+# * parallelize creation across different hosts
+
 # set to 0 to run for real
 my $DRYRUN = 0;
 
@@ -24,6 +29,9 @@ my $DOMAIN  = "";
 
 # required, the gateway address that the environment's servers will use
 my $GATEWAY = "";
+
+# required, the template that lxc-wizard will use (eg: debian-squeeze)
+my $TEMPLATE = "";
 
 # location of the lxc-wizard, if you plan on ssh'ing
 # and doing a remote deploy without root then use sudo,
@@ -56,6 +64,7 @@ my $CONTAINERS = [];
 die ("No spell specified or spell not found.") if (!defined($ARGV[0]) || ! -f $ARGV[0]);
 my $conf = read_file($ARGV[0]);
 eval $conf;
+warn $@ if $@;
 
 foreach my $contoptions (@$CONTAINERS) {
 
@@ -167,6 +176,7 @@ sub wizard {
 	# generate the final command
 	my $cmd = <<EOF
 	ssh -t $USER$conthost -- $WIZ \\
+	--template $TEMPLATE \\
 	--fqdn $options->{fqdn} \\
 	--ipaddr $options->{ipaddr} \\
 	--gwaddr $options->{gwaddr} \\
