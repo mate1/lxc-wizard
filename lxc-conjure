@@ -6,15 +6,48 @@ use Storable 'dclone';
 use File::Basename;
 use File::Temp qw/ :POSIX /;
 use File::Slurp;
+use Getopt::Long;
 
 # conjure is a wrapper around lxc-wizard that makes creating
 # complete environments via spell (definition) files quick
 # and pretty painless.
 
 # TODO:
-# * ability to start, stop, and restart an environment
-# * ability to ping an environment to see what containers are up
-# * parallelize creation across different hosts
+# * parallelize operations across different hosts, keep them serial per host
+
+my ($help, $spell, $wizard, $start, $stop, $restart, $destroy, $info);
+
+GetOptions(
+'help'    => \$help,
+'spell=s' => \$spell,
+'wizard'  => \$wizard,
+'start'   => \$start,
+'stop'    => \$stop,
+'restart' => \$restart,
+'destroy' => \$destroy,
+'info'    => \$info,
+);
+
+help() if $help;
+
+sub help {
+	print <<EOF
+Usage: $0 --spell <spell> <action>
+
+  --spell     Spell (file) to get containers from.
+
+  Actions:
+  --wizard    Create containers.
+  --start     Start containers.
+  --stop      Stop containers.
+  --restart   Restart containers.
+  --destroy   Destroy containers.
+  --info      Get containers' information.
+EOF
+	;
+
+	exit;
+}
 
 # set to 0 to run for real
 my $DRYRUN = 0;
@@ -37,7 +70,7 @@ my $TEMPLATE = "";
 # and doing a remote deploy without root then use sudo,
 # otherwise locally if you run as root or in sudo you
 # can remove it.
-my $WIZ = "sudo -- /home/hisham/bin/lxc-wizard";
+my $WIZ = "sudo -- lxc-wizard";
 
 # if set then this user is used to ssh into
 # the host machines
@@ -46,12 +79,12 @@ my $USER="root@";
 # ssh key that will be transfered to containers
 # more configuration follows to determine what
 # user accounts the key will go into
-my $KEY="/home/hisham/.ssh/id_rsa.pub";
+my $KEY="";
 
 # where the profiles (postcreate) scripts are found.
 # for now there is a limitation that the scripts must
 # be on every host. we'll copy them over with us later.
-my $PROFILE_HOME = "/home/hisham/code/it/LXCWizard/profiles";
+my $PROFILE_HOME = "";
 
 # default settings that will be used for every container.
 my $DEFAULTS = {};
@@ -61,8 +94,8 @@ my $DEFAULTS = {};
 # the default options.
 my $CONTAINERS = [];
 
-die ("No spell specified or spell not found.") if (!defined($ARGV[0]) || ! -f $ARGV[0]);
-my $conf = read_file($ARGV[0]);
+die ("No spell specified or spell not found.") if (!defined($spell) || ! -f $spell);
+my $conf = read_file($spell);
 eval $conf;
 warn $@ if $@;
 
@@ -72,18 +105,80 @@ foreach my $contoptions (@$CONTAINERS) {
 	
 	foreach my $key ( keys $contoptions ) { $options->{$key} = $contoptions->{$key} };
 
-	wizard($options);
+	# cleanups and sanity checks
+	$options->{container} = $options->{fqdn} if !$options->{container};
 
+	if    ($wizard)  { wizard($options);  }
+	elsif ($info)    { info($options);    }
+	elsif ($stop)    { stop($options);    }
+	elsif ($start)   { start($options);   }
+	elsif ($restart) { restart($options); }
+	elsif ($destroy) { destroy($options); }
+}
+
+sub lxc_command {
+	
+	my $options = shift;
+	my $command = shift;
+	my $conthost = $options->{containerhost};
+
+	my $cmd = "lxc-$command -n " . $options->{container};
+
+	unless (is_local($conthost)) {
+		$cmd = "ssh -t $USER$conthost -- " . $cmd;
+	}
+
+	return $cmd;
+}
+
+sub start {
+	my $options = shift;
+	my $cmd = lxc_command($options, "info");
+	my $info = `$cmd`;
+
+	if ($info =~ /STOPPED/) {
+		$cmd = lxc_command($options, "start -d");
+		system($cmd);
+	} else {
+		print "Not starting $options->{container}, not in STOPPED state.\n";
+	}
+}
+
+sub stop {
+	my $cmd = lxc_command(shift, "stop");
+	system($cmd);
+}
+
+sub destroy {
+	my $cmd = lxc_command(shift, "destroy");
+	system($cmd);
+}
+
+sub info {
+	my $options = shift;
+	my $cmd = lxc_command($options, "info");
+	print $options->{container} . ":\n";
+	system($cmd);
+	print "\n";
+}
+
+sub restart {
+	stop(@_);
+	sleep 3;
+	start(@_);
+}
+
+sub is_local {
+
+	my $conthost = shift;
+	return ($conthost =~ /(localhost)|(127\.0\.0\.1)/);
 }
 
 sub wizard {
 
 	my $options = shift;
 	my $conthost = $options->{containerhost};
-
-	# cleanups and sanity checks
-	$options->{container} = $options->{fqdn} if !$options->{container};
-
+	
 	# if we're passed a "user" option, check if it's an array or 
 	# a scalar. if it's an array it should container user:pass entries
 	# otherwise it's a single user:pass entry.
@@ -104,7 +199,7 @@ sub wizard {
 	# copy over the postcreate script into a temporary directory on the host (if any)
 	# copy over keys to be pushed into users' home directories (if any)
 
-	my $remote = ($conthost !~ /(localhost)|(127\.0\.0\.1)/);
+	my $remote = is_local($conthost);
 	my $postcreate = "";
 	my $keys = "";
 
