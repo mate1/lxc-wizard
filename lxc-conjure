@@ -199,7 +199,7 @@ sub wizard {
 	# copy over the postcreate script into a temporary directory on the host (if any)
 	# copy over keys to be pushed into users' home directories (if any)
 
-	my $remote = is_local($conthost);
+	my $remote = !is_local($conthost);
 	my $postcreate = "";
 	my $keys = "";
 
