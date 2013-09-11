@@ -1,0 +1,23 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+my $domain = $ARGV[0];
+my $search = $ARGV[1];
+my $ns1    = $ARGV[2];
+my $ns2    = $ARGV[3];
+my $rootfs = $ARGV[4];
+
+my $cfg = <<EOF
+domain $domain
+search $domain $search
+nameserver $ns1
+nameserver $ns2
+EOF
+;
+
+open  RESOLVCONF, ">$rootfs/etc/resolv.conf";
+print RESOLVCONF  $cfg;
+close RESOLVCONF;
+

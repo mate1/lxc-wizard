@@ -1,0 +1,234 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use Getopt::Long;
+use File::Path;
+
+# Debian lxc-create template
+
+my $distrib    = "squeeze";
+my $arch       = "amd64";
+my $cache_base = "/var/cache/lxc/debian";
+my $cache      = "$cache_base/${distrib}_$arch";
+
+my ($help, $path, $name, $refresh);
+
+GetOptions(
+
+"help" => \$help,
+"path=s" => \$path,
+"name=s" => \$name,
+"refresh=s" => \$refresh,
+);
+
+our $finalRC = 1;
+my $rc = 1;
+
+if ( ! -d $cache ) {
+	$rc = build_cache();
+	checkrc($rc);
+}
+ 
+if ($refresh) {
+	print "Updating cached OS... ";
+	$rc  = not system( "chroot $cache /bin/bash -c 'apt-get update'" );
+	$rc += not system( "chroot $cache /bin/bash -c 'apt-get upgrade'" );
+	checkrc($rc);
+}
+
+my $mountpoint = $path;
+my $rootfs = "$path/rootfs";
+my $hostname = $name;
+
+print "Copying cached container template... ";
+$rc = not system( "cp -a $cache $rootfs" );
+checkrc($rc);
+
+# write hostname
+hostname();
+
+# write lxc configuration
+lxc_cfg();
+
+sub build_cache {
+
+	my $partial = "$cache_base/partial-$distrib-$arch";
+
+	my $mirror = 'http://mirror.peer1.net/debian';
+
+	my $packages = 'locales,dialog,libui-dialog-perl,'
+	. 'ifupdown,netbase,net-tools,iproute,inetutils-ping,'
+	. 'vim,openssh-server,debian-keyring';
+
+	die "Cache directory already exists; not overwriting\n" if( -d $cache );
+
+	print "Creating cache base directory... $cache_base\n";
+	mkpath $cache_base;
+	
+	print "Creating download directory...$partial";
+	$rc = mkpath $partial;
+	checkrc( $rc );
+
+	print "Downloading Debian minimal...debootstrap --verbose --variant=minbase --arch=$arch --include=$packages $distrib $partial $mirror\n";
+	$rc = not system( "debootstrap --verbose --variant=minbase --arch=$arch "
+		.	"--include=$packages $distrib $partial $mirror" );
+	checkrc( $rc );
+
+	print "Renaming cache directory... $partial -> $cache";
+	$rc = rename $partial, $cache;
+	checkrc( $rc );
+
+	print "Fixing network status path... ";
+	$rc = unlink "$cache/etc/network/run";
+	$rc += not system( "ln -s /dev/shm $cache/etc/network/run" );
+	checkrc( $rc );
+
+	print "Updating apt configs... ";
+	open  SOURCES, ">$cache/etc/apt/sources.list";
+	$rc = print SOURCES  etc_sourceslist();
+	close SOURCES;
+	checkrc( $rc );
+
+	open  PREFERENCES, ">$cache/etc/apt/preferences";
+	$rc = print PREFERENCES etc_preferences();
+	close PREFERENCES;
+	checkrc( $rc );
+
+	print "Installing puppet...\n";
+	$rc =  not system( "chroot $cache /bin/bash -c 'apt-get update'" );
+	$rc += not system( "chroot $cache /bin/bash -c 'yes | apt-get install puppet'" );
+	checkrc( $rc );
+
+	return $rc;
+}
+
+sub etc_inittab {
+	return <<EOF;
+id:3:initdefault:
+si::sysinit:/etc/init.d/rcS
+l0:0:wait:/etc/init.d/rc 0
+l1:1:wait:/etc/init.d/rc 1
+l2:2:wait:/etc/init.d/rc 2
+l3:3:wait:/etc/init.d/rc 3
+l4:4:wait:/etc/init.d/rc 4
+l5:5:wait:/etc/init.d/rc 5
+l6:6:wait:/etc/init.d/rc 6
+# Normally not reached, but fallthrough in case of emergency.
+z6:6:respawn:/sbin/sulogin
+1:2345:respawn:/sbin/getty 38400 console
+c1:12345:respawn:/sbin/getty 38400 tty1 linux
+EOF
+}
+
+sub etc_sourceslist {
+	return <<EOF;
+deb http://it.mate1/debian                      squeeze main
+deb http://mirror.peer1.net/debian              squeeze main contrib non-free
+deb http://mirror.peer1.net/debian-security     squeeze/updates main
+deb http://mirror.peer1.net/debian              wheezy          main
+deb http://mirror.peer1.net/debian-security     wheezy/updates  main
+
+EOF
+}
+
+sub etc_preferences {
+	return <<EOF;
+Package: *
+Pin: origin it.mate1
+Pin-Priority: 1001
+
+Package: *
+Pin: release n=squeeze
+Pin-Priority: 990
+
+Package: *
+Pin: release n=wheezy
+Pin-Priority: 1
+
+Package: puppet
+7Pin: release n=wheezy
+Pin-Priority: 995
+
+Package: puppet-common
+Pin: release n=wheezy
+Pin-Priority: 995
+EOF
+}
+
+sub hostname {	
+	open  HOSTNAME, ">$rootfs/etc/hostname";
+	print HOSTNAME  $hostname . "\n";
+	close HOSTNAME;
+}
+
+sub lxc_cfg {
+
+	my $cfg = <<EOF;
+lxc.utsname = $hostname
+
+lxc.tty = 1
+lxc.pts = 1024
+lxc.rootfs = $rootfs
+
+lxc.network.type = veth
+lxc.network.flags = up
+lxc.network.link = br0
+
+# TODO: figure out a way to get these
+#lxc.cgroup.memory.limit_in_bytes = \$memory
+#lxc.cgroup.memory.memsw.limit_in_bytes = \$swap
+#lxc.cgroup.cpu.shares = \$cpushares
+#lxc.cgroup.blkio.weight = \$ioweight
+
+# mount points
+lxc.mount.entry=proc $rootfs/proc proc nodev,noexec,nosuid 0 0
+lxc.mount.entry=sysfs $rootfs/sys sysfs defaults  0 0
+lxc.mount.entry=/etc/hostname $rootfs/etc/host none ro,bind 0 0
+
+lxc.cgroup.devices.deny = a
+# /dev/null and zero
+lxc.cgroup.devices.allow = c 1:3 rwm
+lxc.cgroup.devices.allow = c 1:5 rwm
+# consoles
+lxc.cgroup.devices.allow = c 5:1 rwm
+lxc.cgroup.devices.allow = c 5:0 rwm
+lxc.cgroup.devices.allow = c 4:0 rwm
+lxc.cgroup.devices.allow = c 4:1 rwm
+# /dev/{,u}random
+lxc.cgroup.devices.allow = c 1:9 rwm
+lxc.cgroup.devices.allow = c 1:8 rwm
+lxc.cgroup.devices.allow = c 136:* rwm
+lxc.cgroup.devices.allow = c 5:2 rwm
+# rtc
+lxc.cgroup.devices.allow = c 254:0 rwm
+EOF
+	;
+
+	open  CONFIG, ">$mountpoint/config";
+	print CONFIG  $cfg;
+	close CONFIG;
+}
+
+sub checkrc {
+	my $rc = shift;
+	if ($rc) {
+		print "OK\n";
+	} else {
+		print "error!\n";
+		
+		my $answer;
+
+		do
+		{
+			print "Abort [A] or Continue [C]? ";
+			$answer = <STDIN>; chomp $answer;
+		}
+
+		until( $answer =~ /[AaCc]/ );
+		die "Sorry\n" if $answer =~ /[Aa]/i;
+	}
+
+	$finalRC &&= $rc;
+}
+

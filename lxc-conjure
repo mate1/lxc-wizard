@@ -275,6 +275,9 @@ sub wizard {
 	--fqdn $options->{fqdn} \\
 	--ipaddr $options->{ipaddr} \\
 	--gwaddr $options->{gwaddr} \\
+	--search $options->{gwaddr} \\
+	--ns1 $options->{ns1} \\
+	--ns2 $options->{ns2} \\
 	--cpushares=$options->{cpushares} \\
 	--ioweight=$options->{ioweight} \\
 	--memory=$options->{memory} \\

@@ -14,9 +14,11 @@ use File::Copy;
 use File::Path;
 use File::Slurp;
 
-# Unused
-my $DEBUG = 0;
-my $FAKE = 0;
+# To get requirements on Debian:
+# apt-get install libtie-ixhash-perl libfile-slurp-perl libfile-slurp-unicode-perl
+
+my $DEBUG  = 0;
+my $DRYRUN = 0;
 
 my $help;
 
@@ -39,10 +41,7 @@ our %Default = (
     GO		=> 'Y'
 );
 
-our $arch = `dpkg --print-architecture`; chomp $arch;
-our $distrib = 'squeeze';
-
-our( $container, $hostname, $domain, $fqdn, $ipaddr, $gwaddr );	# User provided information
+our( $container, $hostname, $domain, $dnsdomain, $search, $ns1, $ns2, $fqdn, $ipaddr, $gwaddr );	# User provided information
 our( $vgname, $lvname, $lvsize, $mountpoint, $rootfs );
 our( $memory, $swap, $cpushares, $ioweight, $autostart, $launch );
 our( $rootpass, @users, @keys );
@@ -56,6 +55,10 @@ GetOptions( 'help'		=> \$help,
 
 	    'hostname=s'	=> \$hostname,
 	    'domain=s'		=> \$domain,
+		  'dnsdomain=s' => \$dnsdomain,
+		  'search=s'    => \$search,
+		  'ns1=s'       => \$ns1,
+		  'ns2=s'       => \$ns2,
 	    'fqdn=s'		=> \$fqdn,
 	    'ipaddr=s'		=> \$ipaddr,
 	    'gwaddr=s'		=> \$gwaddr,
@@ -88,7 +91,8 @@ GetOptions( 'help'		=> \$help,
 	    'REFRESH'		=> \$REFRESH,
 
 	    'AUTO'		=> \$AUTO,
-	    'FAKE'		=> \$FAKE );
+		  'dryrun'  => \$DRYRUN
+	    );
 
 #	    'MEMORY=s'		=> \$MEMORY,
 #	    'CPU=s'		=> \$CPU,
@@ -98,16 +102,30 @@ print "\n** Container Creation Wizard **\n";
 
 help() if $help;
 
+sub run {
+	my $cmd = shift;
+
+	if ($DRYRUN) {
+		print $cmd, "\n";
+	} else {
+		system($cmd);
+	}
+}
+
 sub help
 {
     print <<EOH;
 Usage: $0 [options]
 
-    --template TPL  template that will define the container's layout
+    --template TPL  template (dir) that will define the container's layout
 
     --fqdn DQDN     full qualified domain name of the target container
     --hostname HOST hostname (if it can't be extracted from the fqdn)
     --domain DOMAIN domain name (if it can't be extracted from the fqdn)
+    --dnsdomain DOMAIN domain used in resolv.conf 
+    --search SEARCH dns search domains in resolv.conf
+    --ns1    NS1    first name server
+    --ns1    NS1    second name server
     --ipaddr IPADDR ip address (if it can't be found by gethost call)
     --gwaddr IPADDR gateway address
 
@@ -119,7 +137,7 @@ Usage: $0 [options]
                     (can be passed multiple times)
 
     --postcreate    script to copy into the container and run
-                    after the container is created.
+                    after the container is created (in the chroot)
     
     Anything passed at the end after -- will be passed along to the
     post create script. For example: -- --cluster-id 1
@@ -128,24 +146,6 @@ EOH
 
 do
 {
-	if( $BUILD )
-	{
-		$rc = build_cache();
-		exit not $rc;
-	}
-	
-	if( $REFRESH )
-	{
-		my $cache   = "/var/cache/lxc/rootfs-$distrib-$arch"; # Defined in two places
-		
-		print "Updating cached OS... ";
-		$rc =  not system( "chroot $cache /bin/bash -c 'apt-get update'" );
-		$rc += not system( "chroot $cache /bin/bash -c 'apt-get upgrade'" );
-		checkrc( $rc );
-		
-		exit not $rc;
-	}
-	
 	if( $AUTO )
 	{
 		print "Creating container with the following parameters:\n\n";
@@ -313,65 +313,63 @@ else
 	checkrc( $rc );
 }
 
-my $tpl = read_file($template);
-eval $tpl;
-warn $@ if $@;
-
 if( $CREATE eq 'Y' )
 {
 	# Brute SH-to-Perl transliteration follows
-	
+
+
 	$rootfs = "$mountpoint/rootfs";
 	
-	print "Copying cached container template... ";
-	$rc = not system( "cp -a /var/cache/lxc/rootfs-$distrib-$arch $rootfs" );
+	run("$template/main --path $mountpoint --name $hostname");
+
+	print "Adding host link... ";
+	$rc = not system( "touch $rootfs/etc/host" );
 	checkrc( $rc );
-	
-	# write hostname
-	hostname();
-	
-	# write ip / host / fqdn in /etc/hosts
-	etc_hosts();
-	
-	# write network configuration
-	network_cfg();
-	
-	# write dns configuration
-	dns_cfg();
-	
-	# write lxc configuration
-	lxc_cfg();
-	
-	if( $rootpass )
+
+	if (-f "$template/etc_hosts" && $ipaddr && $hostname && $fqdn) {
+		run("$template/etc_hosts $ipaddr $hostname $fqdn $rootfs");
+	}
+
+	if (-f "$template/dns" && $dnsdomain && $search && $ns1 && $ns2) {
+		run("$template/dns $dnsdomain \\'$search\\' $ns1 $ns2 $rootfs");
+	}
+
+	if (-f "$template/network" && $ipaddr && $gwaddr) {
+		run("$template/network $ipaddr $gwaddr $rootfs");
+	}
+
+	if (-f "$template/rootpass" && $rootpass )
 	{
-		root_pass();	
-		# TODO: we should check if the above succeeded
+		run("$template/rootpass $rootpass $rootfs");
 	}
 	
 	# add users
-	if( @users ) {
+	if( -f "$template/adduser" && @users ) {
 		foreach my $userpass (@users) {
 			if ($userpass =~ /(.+):(.+)/) {
 				my $user = $1;
 				my $pass = $2;
 				print "Adding user $user...";
-				$rc = add_user($user, $pass);
-				checkrc($rc);
+				run("$template/adduser $user $pass $rootfs");
 			}
 		}
 	}
 	
 	# deploy ssh keys
-	if( @keys ) {
+	if( -f "$template/addsshkey" && @keys ) {
 		foreach my $userkey (@keys) {
 			if ($userkey =~ /(.+):(.+)/) {
 
 				my $user = $1;
 				my $key = $2;
 				
-				add_ssh_key($user, $key);
+				run("$template/addsshkey $user $key $rootfs");
 			}
 		}
+	}
+
+	if (-f "$template/extras") {
+		run("$template/extras");
 	}
 	
 	# run post create script if any
