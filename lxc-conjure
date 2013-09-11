@@ -63,7 +63,8 @@ my $DOMAIN  = "";
 # required, the gateway address that the environment's servers will use
 my $GATEWAY = "";
 
-# required, the template that lxc-wizard will use (eg: debian-squeeze)
+# required, the template that lxc-wizard will use (eg: debian/squeeze), 
+# can be overridden per container
 my $TEMPLATE = "";
 
 # location of the lxc-wizard, if you plan on ssh'ing
@@ -107,6 +108,7 @@ foreach my $contoptions (@$CONTAINERS) {
 
 	# cleanups and sanity checks
 	$options->{container} = $options->{fqdn} if !$options->{container};
+	$options->{template} = $TEMPLATE if !$options->{template};
 
 	if    ($wizard)  { wizard($options);  }
 	elsif ($info)    { info($options);    }
@@ -271,7 +273,7 @@ sub wizard {
 	# generate the final command
 	my $cmd = <<EOF
 	ssh -t $USER$conthost -- $WIZ \\
-	--template $TEMPLATE \\
+	--template $options->{template} \\
 	--fqdn $options->{fqdn} \\
 	--ipaddr $options->{ipaddr} \\
 	--gwaddr $options->{gwaddr} \\

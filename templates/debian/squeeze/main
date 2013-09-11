@@ -147,7 +147,7 @@ Pin: release n=wheezy
 Pin-Priority: 1
 
 Package: puppet
-7Pin: release n=wheezy
+Pin: release n=wheezy
 Pin-Priority: 995
 
 Package: puppet-common
