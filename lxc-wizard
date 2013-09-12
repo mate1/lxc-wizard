@@ -41,7 +41,7 @@ our %Default = (
     GO		=> 'Y'
 );
 
-our( $container, $hostname, $domain, $dnsdomain, $search, $ns1, $ns2, $fqdn, $ipaddr, $gwaddr );	# User provided information
+our( $container, $hostname, $domain, $dnsdomain, @search, $ns1, $ns2, $fqdn, $ipaddr, $gwaddr );	# User provided information
 our( $vgname, $lvname, $lvsize, $mountpoint, $rootfs );
 our( $memory, $swap, $cpushares, $ioweight, $autostart, $launch );
 our( $rootpass, @users, @keys );
@@ -56,7 +56,7 @@ GetOptions( 'help'		=> \$help,
 	    'hostname=s'	=> \$hostname,
 	    'domain=s'		=> \$domain,
 		  'dnsdomain=s' => \$dnsdomain,
-		  'search=s'    => \$search,
+		  'search=s'    => \@search,
 		  'ns1=s'       => \$ns1,
 		  'ns2=s'       => \$ns2,
 	    'fqdn=s'		=> \$fqdn,
@@ -124,6 +124,7 @@ Usage: $0 [options]
     --domain DOMAIN domain name (if it can't be extracted from the fqdn)
     --dnsdomain DOMAIN domain used in resolv.conf 
     --search SEARCH dns search domains in resolv.conf
+                    (can be passed multiple times)
     --ns1    NS1    first name server
     --ns1    NS1    second name server
     --ipaddr IPADDR ip address (if it can't be found by gethost call)
@@ -330,8 +331,8 @@ if( $CREATE eq 'Y' )
 		run("$template/etc_hosts $ipaddr $hostname $fqdn $rootfs");
 	}
 
-	if (-f "$template/dns" && $dnsdomain && $search && $ns1 && $ns2) {
-		run("$template/dns $dnsdomain \\'$search\\' $ns1 $ns2 $rootfs");
+	if (-f "$template/dns" && $dnsdomain && @search && $ns1 && $ns2) {
+		run("$template/dns $dnsdomain \'" . join(" ", @search) . "\' $ns1 $ns2 $rootfs");
 	}
 
 	if (-f "$template/network" && $ipaddr && $gwaddr) {

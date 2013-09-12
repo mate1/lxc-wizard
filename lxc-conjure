@@ -269,6 +269,18 @@ sub wizard {
 			}
 		}
 	}
+
+	my $search = "";
+
+	if ($options->{search}) {
+		if (ref($options->{search}) eq "ARRAY") {
+			for my $s (@{$options->{search}}) {
+				$search .= "--search $s ";
+			}
+		} elsif (ref($options->{search}) eq "") {
+			$users .= "--search " . $options->{search}. " ";
+		}
+	}
 	
 	# generate the final command
 	my $cmd = <<EOF
@@ -277,7 +289,8 @@ sub wizard {
 	--fqdn $options->{fqdn} \\
 	--ipaddr $options->{ipaddr} \\
 	--gwaddr $options->{gwaddr} \\
-	--search $options->{gwaddr} \\
+	--dnsdomain $options->{dnsdomain} \\
+	$search \\
 	--ns1 $options->{ns1} \\
 	--ns2 $options->{ns2} \\
 	--cpushares=$options->{cpushares} \\
