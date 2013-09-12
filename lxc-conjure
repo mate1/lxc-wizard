@@ -104,7 +104,8 @@ foreach my $contoptions (@$CONTAINERS) {
 
 	my $options = dclone $DEFAULTS;
 	
-	foreach my $key ( keys $contoptions ) { $options->{$key} = $contoptions->{$key} };
+	# contoptions overrides options
+	foreach my $key ( keys $contoptions ) { $options->{$key} = $contoptions->{$key} }
 
 	# cleanups and sanity checks
 	$options->{container} = $options->{fqdn} if !$options->{container};
@@ -305,7 +306,7 @@ sub wizard {
 	$users \\
 	$keys \\
 	-- \\
-	--depmode $DEPMODE
+	$options->{"--"}
 EOF
 	;
 
