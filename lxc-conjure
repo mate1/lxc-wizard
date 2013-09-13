@@ -282,7 +282,10 @@ sub wizard {
 			$users .= "--search " . $options->{search}. " ";
 		}
 	}
-	
+
+	my $extras = "";
+	$extras = " -- " . $options->{"--"} if ($options->{"--"});
+
 	# generate the final command
 	my $cmd = <<EOF
 	ssh -t $USER$conthost -- $WIZ \\
@@ -305,8 +308,7 @@ sub wizard {
 	--rootpass $options->{rootpass} \\
 	$users \\
 	$keys \\
-	-- \\
-	$options->{"--"}
+	$extras
 EOF
 	;
 
