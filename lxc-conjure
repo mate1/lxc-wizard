@@ -54,9 +54,6 @@ my $DRYRUN = 0;
 
 # environment specific settings
 
-# required, deployment mode, or environment name
-my $DEPMODE = "";
-
 # required, the domain name that the environment's servers will have
 my $DOMAIN  = "";
 
