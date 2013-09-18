@@ -1,0 +1,11 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+my $user   = shift;
+my $pass   = shift;
+my $rootfs = shift;
+
+system("chroot $rootfs useradd $user --create-home --shell /bin/bash --password " . crypt($pass, "aa"));
+

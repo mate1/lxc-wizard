@@ -1,0 +1,12 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+my $rootpass = shift;
+my $rootfs = shift;
+
+open(PASS, "| chroot $rootfs /usr/sbin/chpasswd");
+print PASS "root:$rootpass\n";
+close(PASS);
+
