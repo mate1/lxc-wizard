@@ -376,10 +376,14 @@ if( $CREATE eq 'Y' )
 	# run post create script if any
 	if( $postcreate && -f $postcreate )
 	{
-		print "Running post create script...";
+		print "Running post create script (mounting /proc, /sys)...";
 		copy($postcreate, $rootfs);
 		my $pc = basename($postcreate);
-		$rc = not system("chmod +x $rootfs/$pc && chroot $rootfs /$pc " . join(" ", @ARGV));
+		$rc = not system("mount -o bind /proc $rootfs/proc");
+		$rc += not system("mount -o bind /sys $rootfs/sys");
+		$rc += not system("chmod +x $rootfs/$pc && chroot $rootfs /$pc " . join(" ", @ARGV));
+		$rc += not system("umount $rootfs/sys");
+		$rc += not system("umount $rootfs/proc");
 		unlink("$rootfs/$pc");
 		checkrc( $rc );
 	}
