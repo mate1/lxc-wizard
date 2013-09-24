@@ -7,15 +7,32 @@ use File::Basename;
 use File::Temp qw/ :POSIX /;
 use File::Slurp;
 use Getopt::Long;
+use Parallel::Runner;
 
-# conjure is a wrapper around lxc-wizard that makes creating
-# complete environments via spell (definition) files quick
-# and pretty painless.
+############################################################
+#                                                          #
+# Copyright (C) 2013 Mate1 Inc.                            #
+#                                                          #
+############################################################
 
-# TODO:
-# * parallelize operations across different hosts, keep them serial per host
+=head1 NAME
 
-my ($help, $spell, $wizard, $start, $stop, $restart, $destroy, $info);
+lxc-conjure - Create complete lxc environments easily.
+
+=head1 DESCRIPTION
+
+B<lxc-conjure> is a wrapper around lxc-wizard that makes creating
+complete environments via spell (definition) files quick
+and pretty painless.
+
+=head1 DEPENDENCIES
+
+cpan -i Parallel::Runner
+apt-get install libtie-ixhash-perl libfile-slurp-perl libfile-slurp-unicode-perl
+
+=cut
+
+my ($help, $spell, $wizard, $start, $stop, $restart, $destroy, $info, $parallel);
 
 GetOptions(
 'help'    => \$help,
@@ -26,6 +43,7 @@ GetOptions(
 'restart' => \$restart,
 'destroy' => \$destroy,
 'info'    => \$info,
+'parallel'=> \$parallel,
 );
 
 help() if $help;
@@ -43,6 +61,8 @@ Usage: $0 --spell <spell> <action>
   --restart   Restart containers.
   --destroy   Destroy containers.
   --info      Get containers' information.
+  --parallel  Create containers in parallel across
+              different hosts.
 EOF
 	;
 
@@ -97,23 +117,60 @@ my $conf = read_file($spell);
 eval $conf;
 warn $@ if $@;
 
-foreach my $contoptions (@$CONTAINERS) {
+if ($wizard && $parallel) {
+	# parallel creation
+	my $hosts = {};
 
-	my $options = dclone $DEFAULTS;
+	for my $contoptions (@$CONTAINERS) {
+		my $options = hash_merge($DEFAULTS, $contoptions);
+
+		# TODO: this is duplicated further down, clean
+		# cleanups and sanity checks 
+		$options->{container} = $options->{fqdn} if !$options->{container};
+		$options->{template} = $TEMPLATE if !$options->{template};
+
+		push @{ $hosts->{$contoptions->{containerhost}} }, $options;
+	}
+
+	my $runner = Parallel::Runner->new(scalar keys %$hosts);
+
+	for my $host ( keys $hosts ) {
+		my $containers = $hosts->{$host};
+
+		$runner->run( sub { wizard($_) foreach (@$containers) } );
+	}
+
+	$runner->finish();
+
+} else {
+
+	# serial execution
+	foreach my $contoptions (@$CONTAINERS) {
+
+		my $options = hash_merge($DEFAULTS, $contoptions);
 	
-	# contoptions overrides options
-	foreach my $key ( keys $contoptions ) { $options->{$key} = $contoptions->{$key} }
+		# TODO: this is duplicated above, clean
+		# cleanups and sanity checks
+		$options->{container} = $options->{fqdn} if !$options->{container};
+		$options->{template} = $TEMPLATE if !$options->{template};
 
-	# cleanups and sanity checks
-	$options->{container} = $options->{fqdn} if !$options->{container};
-	$options->{template} = $TEMPLATE if !$options->{template};
+		if    ($wizard)  { wizard($options);  }
+		elsif ($info)    { info($options);    }
+		elsif ($stop)    { stop($options);    }
+		elsif ($start)   { start($options);   }
+		elsif ($restart) { restart($options); }
+		elsif ($destroy) { destroy($options); }
+	}
+}
 
-	if    ($wizard)  { wizard($options);  }
-	elsif ($info)    { info($options);    }
-	elsif ($stop)    { stop($options);    }
-	elsif ($start)   { start($options);   }
-	elsif ($restart) { restart($options); }
-	elsif ($destroy) { destroy($options); }
+sub hash_merge {
+	my ($dest, $source) = @_;
+	my $hash = dclone $dest;
+	
+	# source values overwrite dest values
+	foreach my $key ( keys $source ) { $hash->{$key} = $source->{$key} }
+
+	return $hash;
 }
 
 sub lxc_command {
