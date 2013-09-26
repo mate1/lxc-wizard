@@ -358,7 +358,6 @@ sub wizard {
 	--SWAP=$options->{SWAP} \\
 	--LVM=$options->{LVM} \\
 	--auto \\
-	--postcreate $postcreate \\
 	--rootpass $options->{rootpass} \\
 	$users \\
 	$keys \\
@@ -368,6 +367,17 @@ EOF
 
 	if ($DRYRUN) { print($cmd . "\n"); }
 	else { system($cmd); }
+
+	if ($options->{profile}) {
+		sleep 10;
+		print("Running profile...\n");
+		if ($DRYRUN) { print("-> " . $options->{profile} . "\n"); }
+		# copy over postcreate
+		$postcreate = "/tmp/" . $$ . "-" . basename($options->{profile});
+		system("scp $PROFILE_HOME/$options->{profile} $USER$options->{ipaddr}:$postcreate");
+		system("ssh -t $USER$options->{ipaddr} /bin/bash -c $postcreate " . $options->{"--"});
+		print("\n\n\n\n\nssh -t $USER$options->{ipaddr} /bin/bash -c $postcreate " . $options->{"--"} . "\n\n\n");
+	}
 
 	if ($options->{deployscript}) {
 		sleep 10; # wait for container to come up
