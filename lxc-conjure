@@ -178,12 +178,7 @@ sub lxc_command {
 	my $options = shift;
 	my $command = shift;
 	my $conthost = $options->{containerhost};
-
-	my $cmd = "lxc-$command -n " . $options->{container};
-
-	unless (is_local($conthost)) {
-		$cmd = "ssh -t $USER$conthost -- " . $cmd;
-	}
+	my $cmd = "ssh -t $USER$conthost -- lxc-$command -n " . $options->{container};
 
 	return $cmd;
 }
@@ -223,12 +218,6 @@ sub restart {
 	stop(@_);
 	sleep 3;
 	start(@_);
-}
-
-sub is_local {
-
-	my $conthost = shift;
-	return ($conthost =~ /(localhost)|(127\.0\.0\.1)/);
 }
 
 sub wizard {
