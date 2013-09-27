@@ -84,10 +84,7 @@ my $GATEWAY = "";
 # can be overridden per container
 my $TEMPLATE = "";
 
-# location of the lxc-wizard, if you plan on ssh'ing
-# and doing a remote deploy without root then use sudo,
-# otherwise locally if you run as root or in sudo you
-# can remove it.
+# location of the lxc-wizard
 my $WIZ = "sudo -- lxc-wizard";
 
 # if set then this user is used to ssh into
@@ -252,36 +249,12 @@ sub wizard {
 		}
 	}
 
-	# if this is a remote deployment:
-	# copy over the postcreate script into a temporary directory on the host (if any)
-	# copy over keys to be pushed into users' home directories (if any)
-
-	my $remote = !is_local($conthost);
 	my $postcreate = "";
 	my $keys = "";
 
-	if ($remote) {
-
-		# copy over postcreate
-		$postcreate = "/tmp/" . $$ . "-" . basename($options->{profile});
-		system("scp $PROFILE_HOME/$options->{profile} $conthost:$postcreate");
-
-	} else {
-
-		# locally available postcreate
-		$postcreate = $options->{profile};
-
-		# locally available keys
-		if ($options->{key}) {
-			if (ref($options->{key}) eq "ARRAY") {
-				for my $userkey (@{$options->{key}}) {
-					$keys .= "--key $userkey " if ($userkey =~ /(.+):(.+)/);
-				}
-			} elsif (ref($options->{key}) eq "") {
-				$keys .= "--key " . $options->{key} . " ";
-			}
-		}
-	}
+	# copy over postcreate
+	$postcreate = "/tmp/" . $$ . "-" . basename($options->{profile});
+	system("scp $PROFILE_HOME/$options->{profile} $conthost:$postcreate");
 
 	# handle ssh keys if any
 	if ($options->{key}) {
@@ -291,37 +264,22 @@ sub wizard {
 			# we're passed multiple keys
 			for my $userkey (@{$options->{key}}) {
 
-				if ($remote) {
-
-					# copy key over and change key file accordingly
-					my ($user, $keyfile) = split(/:/, $userkey);
-					my $key = tmpnam() . $$ . ".key";
-					system("scp $keyfile $conthost:$key");
-					$keys .= "--key $user:$key ";
-
-				} else {
-
-					# use locally available key
-					$keys .= "--key $userkey " if ($userkey =~ /(.+):(.+)/);
-				}
-			}
-
-		} elsif (ref($options->{key}) eq "") { # we're passed one key			
-
-			if ($remote) {
-
 				# copy key over and change key file accordingly
-				my $userkey = $options->{key};
 				my ($user, $keyfile) = split(/:/, $userkey);
 				my $key = tmpnam() . $$ . ".key";
 				system("scp $keyfile $conthost:$key");
 				$keys .= "--key $user:$key ";
 
-			} else {
-
-				# use locally available key
-				$keys .= "--key " . $options->{key} . " ";
 			}
+
+		} elsif (ref($options->{key}) eq "") { # we're passed one key			
+
+			# copy key over and change key file accordingly
+			my $userkey = $options->{key};
+			my ($user, $keyfile) = split(/:/, $userkey);
+			my $key = tmpnam() . $$ . ".key";
+			system("scp $keyfile $conthost:$key");
+			$keys .= "--key $user:$key ";
 		}
 	}
 
@@ -366,24 +324,31 @@ EOF
 	;
 
 	if ($DRYRUN) { print($cmd . "\n"); }
-	else { system($cmd); }
+	else { 
 
-	if ($options->{profile}) {
-		sleep 10;
-		print("Running profile...\n");
-		if ($DRYRUN) { print("-> " . $options->{profile} . "\n"); }
-		# copy over postcreate
-		$postcreate = "/tmp/" . $$ . "-" . basename($options->{profile});
-		system("scp $PROFILE_HOME/$options->{profile} $USER$options->{ipaddr}:$postcreate");
-		system("ssh -t $USER$options->{ipaddr} /bin/bash -c $postcreate " . $options->{"--"});
-		print("\n\n\n\n\nssh -t $USER$options->{ipaddr} /bin/bash -c $postcreate " . $options->{"--"} . "\n\n\n");
-	}
+		system($cmd);
 
-	if ($options->{deployscript}) {
-		sleep 10; # wait for container to come up
-		print("Running deployscript...\n");
-		if ($DRYRUN) { print("-> " . $options->{deployscript} . "\n"); }
-		else { system("/bin/bash -c \"$options->{deployscript}\""); }
+		if ($options->{profile} || $options->{deployscript}) {
+			sleep 10; # wait for container to come up
+
+			if ($options->{profile}) {
+
+				print("Running profile...\n");
+
+				my $profile = "/tmp/" . $$ . "-" . basename($options->{profile});
+				my $args = $options->{"--"} || "";
+
+				system("scp $PROFILE_HOME/$options->{profile} $USER$options->{ipaddr}:$profile");
+				system("ssh -t $USER$options->{ipaddr} $profile " . $args);
+			}
+
+			if ($options->{deployscript}) {
+
+				print("Running deployscript...\n");
+				system($options->{deployscript});
+			}
+		}
 	}
+	
 }
 
