@@ -246,7 +246,7 @@ sub wizard {
 
 	# copy over postcreate
 	$postcreate = "/tmp/" . $$ . "-" . basename($options->{profile});
-	system("scp $PROFILE_HOME/$options->{profile} $conthost:$postcreate");
+	system("scp $PROFILE_HOME/$options->{profile} $USER$conthost:$postcreate");
 
 	# handle ssh keys if any
 	if ($options->{key}) {
@@ -259,7 +259,7 @@ sub wizard {
 				# copy key over and change key file accordingly
 				my ($user, $keyfile) = split(/:/, $userkey);
 				my $key = tmpnam() . $$ . ".key";
-				system("scp $keyfile $conthost:$key");
+				system("scp $keyfile $USER$conthost:$key");
 				$keys .= "--key $user:$key ";
 
 			}
@@ -270,7 +270,7 @@ sub wizard {
 			my $userkey = $options->{key};
 			my ($user, $keyfile) = split(/:/, $userkey);
 			my $key = tmpnam() . $$ . ".key";
-			system("scp $keyfile $conthost:$key");
+			system("scp $keyfile $USER$conthost:$key");
 			$keys .= "--key $user:$key ";
 		}
 	}
