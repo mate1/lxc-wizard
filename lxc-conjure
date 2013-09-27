@@ -202,8 +202,41 @@ sub stop {
 }
 
 sub destroy {
-	my $cmd = lxc_command(shift, "destroy");
-	system($cmd);
+
+	my $options = shift;
+
+	# TODO: don't do this if it's not needed
+	stop($options);
+	sleep(2);
+
+	my $conthost = $options->{containerhost};
+
+	if ($options->{LVM} eq "Y") {
+
+		# destroy the LVM volume
+		
+		my @vgs = `ssh -t $USER$conthost -- vgdisplay | grep Name`;
+		$vgs[0] =~ /Name\s+(\w+)/;
+		
+		my $vgname = $1;
+		my $lvname = $options->{container};
+		my $volume = "/dev/mapper/$vgname-$lvname";
+		my $mountpoint = "/var/lib/lxc/$lvname";
+
+		print "Umounting Logical Volume...\n";
+		system("ssh -t $USER$conthost -- umount $mountpoint");
+
+		print "Removing Logical Volume...\n";
+		system("ssh -t $USER$conthost -- lvremove -f $volume");
+
+		print "Updating /etc/fstab...\n";
+		# delete the line containing a slash followed by the lvname
+		# for example: ... /var/lib/lxc/1.sender.tiamail.qa.blackhowler.gene ...
+		system("ssh -t $USER$conthost -- sed -i '/\\\\\\/$lvname/d' /etc/fstab");
+
+	} 
+
+	system("ssh -t $USER$conthost -- rm -rf --preserve-root /var/lib/lxc/$options->{container}");
 }
 
 sub info {
