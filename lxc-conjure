@@ -354,7 +354,7 @@ EOF
 		system($cmd);
 
 		if ($options->{profile} || $options->{deployscript}) {
-			sleep 10; # wait for container to come up
+			sleep 30; # wait for container to come up
 
 			if ($options->{profile}) {
 
