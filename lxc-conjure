@@ -364,6 +364,7 @@ EOF
 				my $args = $options->{"--"} || "";
 
 				system("scp $PROFILE_HOME/$options->{profile} $USER$options->{ipaddr}:$profile");
+				system("ssh -t $USER$options->{ipaddr} chmod +x $profile");
 				system("ssh -t $USER$options->{ipaddr} $profile " . $args);
 			}
 
