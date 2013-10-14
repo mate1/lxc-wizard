@@ -355,7 +355,7 @@ EOF
 		system($cmd);
 
 		if ($options->{profile} || $options->{deployscript}) {
-			sleep 10; # wait for container to come up
+			sleep 30; # wait for container to come up
 
 			if ($options->{profile}) {
 
@@ -365,6 +365,7 @@ EOF
 				my $args = $options->{"--"} || "";
 
 				system("scp $PROFILE_HOME/$options->{profile} $USER$options->{ipaddr}:$profile");
+				system("ssh -t $USER$options->{ipaddr} chmod +x $profile");
 				system("ssh -t $USER$options->{ipaddr} $profile " . $args);
 			}
 
