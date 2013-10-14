@@ -28,7 +28,8 @@ and pretty painless.
 =head1 DEPENDENCIES
 
 cpan -i Parallel::Runner
-apt-get install libtie-ixhash-perl libfile-slurp-perl libfile-slurp-unicode-perl
+cpan -i Number::Spell
+apt-get install libtie-ixhash-perl libfile-slurp-perl libfile-slurp-unicode-perl libmojolicious-perl libdata-section-simple-perl 
 
 =cut
 
