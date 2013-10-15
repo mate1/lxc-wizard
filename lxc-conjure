@@ -146,7 +146,7 @@ if ($wizard && $parallel) {
 } else {
 
 	# serial execution
-	foreach my $contoptions (@$CONTAINERS) {
+	CONT: foreach my $contoptions (@$CONTAINERS) {
 
 		my $options = hash_merge($DEFAULTS, $contoptions);
 	
@@ -154,6 +154,8 @@ if ($wizard && $parallel) {
 		# cleanups and sanity checks
 		$options->{container} = $options->{fqdn} if !$options->{container};
 		$options->{template} = $TEMPLATE if !$options->{template};
+
+		next CONT if ($options->{ignore} && $options->{ignore} == 1);
 
 		if    ($wizard)  { wizard($options);  }
 		elsif ($info)    { info($options);    }
@@ -167,7 +169,6 @@ if ($wizard && $parallel) {
 sub hash_merge {
 	my ($dest, $source) = @_;
 	my $hash = dclone $dest;
-	
 	# source values overwrite dest values
 	foreach my $key ( keys $source ) { $hash->{$key} = $source->{$key} }
 
@@ -355,7 +356,10 @@ EOF
 		system($cmd);
 
 		if ($options->{profile} || $options->{deployscript}) {
-			sleep 30; # wait for container to come up
+
+			# wait for container to come up
+			if ($options->{startsleep}) { sleep ($options->{startsleep}) }
+			else { sleep 30 };
 
 			if ($options->{profile}) {
 
@@ -372,7 +376,35 @@ EOF
 			if ($options->{deployscript}) {
 
 				print("Running deployscript...\n");
-				system($options->{deployscript});
+				my $depscript = $options->{deployscript};
+				my $r = ref($depscript);
+
+				if ($r eq "") {
+					
+					# scalar, should be a string representing a script			
+					system($depscript);
+
+				} elsif ($r eq "CODE") {
+
+					# code, run it
+					&$depscript();
+
+				} elsif ($r eq "ARRAY" && scalar($depscript) > 0) {
+
+					if (ref(@$depscript[0]) eq "CODE") {
+
+						# callback, run it and pass params if any
+						my $cb = @$depscript[0];
+
+						if (scalar($depscript) > 1) {
+							shift($depscript);
+							&$cb(@$depscript);
+						} else {
+							&$cb();
+						}
+					}
+
+				}
 			}
 		}
 	}
