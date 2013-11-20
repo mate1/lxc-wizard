@@ -135,7 +135,7 @@ if ($wizard && $parallel) {
 
 	my $runner = Parallel::Runner->new(scalar keys %$hosts);
 
-	for my $host ( keys $hosts ) {
+	for my $host ( keys %$hosts ) {
 		my $containers = $hosts->{$host};
 
 		$runner->run( sub { wizard($_) foreach (@$containers) } );
@@ -170,7 +170,7 @@ sub hash_merge {
 	my ($dest, $source) = @_;
 	my $hash = dclone $dest;
 	# source values overwrite dest values
-	foreach my $key ( keys $source ) { $hash->{$key} = $source->{$key} }
+	foreach my $key ( keys %$source ) { $hash->{$key} = $source->{$key} }
 
 	return $hash;
 }
@@ -397,7 +397,7 @@ EOF
 						my $cb = @$depscript[0];
 
 						if (scalar($depscript) > 1) {
-							shift($depscript);
+							shift(@$depscript);
 							&$cb(@$depscript);
 						} else {
 							&$cb();
