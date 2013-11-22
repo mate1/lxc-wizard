@@ -33,12 +33,12 @@ apt-get install libtie-ixhash-perl libfile-slurp-perl libfile-slurp-unicode-perl
 
 =cut
 
-my ($help, $spell, $wizard, $start, $stop, $restart, $destroy, $info, $parallel);
+my ($help, $spell, $create, $start, $stop, $restart, $destroy, $info, $parallel);
 
 GetOptions(
 'help'    => \$help,
 'spell=s' => \$spell,
-'wizard'  => \$wizard,
+'create'  => \$create,
 'start'   => \$start,
 'stop'    => \$stop,
 'restart' => \$restart,
@@ -56,7 +56,7 @@ Usage: $0 --spell <spell> <action>
   --spell     Spell (file) to get containers from.
 
   Actions:
-  --wizard    Create containers.
+  --create    Create containers.
   --start     Start containers.
   --stop      Stop containers.
   --restart   Restart containers.
@@ -118,7 +118,7 @@ my $conf = read_file($spell);
 eval $conf;
 warn $@ if $@;
 
-if ($wizard && $parallel) {
+if ($create && $parallel) {
 	# parallel creation
 	my $hosts = {};
 
@@ -157,7 +157,7 @@ if ($wizard && $parallel) {
 
 		next CONT if ($options->{ignore} && $options->{ignore} == 1);
 
-		if    ($wizard)  { wizard($options);  }
+		if    ($create)  { wizard($options);  }
 		elsif ($info)    { info($options);    }
 		elsif ($stop)    { stop($options);    }
 		elsif ($start)   { start($options);   }
