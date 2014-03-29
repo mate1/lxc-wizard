@@ -9,6 +9,8 @@ use File::Slurp;
 use Getopt::Long;
 use Parallel::Runner;
 
+use Data::Dumper;
+
 ############################################################
 #                                                          #
 # Copyright (C) 2013 Mate1 Inc.                            #
@@ -123,6 +125,7 @@ if ($create && $parallel) {
 	my $hosts = {};
 
 	for my $contoptions (@$CONTAINERS) {
+
 		my $options = hash_merge($DEFAULTS, $contoptions);
 
 		# TODO: this is duplicated further down, clean
@@ -130,7 +133,8 @@ if ($create && $parallel) {
 		$options->{container} = $options->{fqdn} if !$options->{container};
 		$options->{template} = $TEMPLATE if !$options->{template};
 
-		push @{ $hosts->{$contoptions->{containerhost}} }, $options;
+
+		push @{ $hosts->{$options->{containerhost}} }, $options;
 	}
 
 	my $runner = Parallel::Runner->new(scalar keys %$hosts);
