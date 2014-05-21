@@ -55,7 +55,7 @@ sub build_cache {
 
 	my $partial = "$cache_base/partial-$distrib-$arch";
 
-	my $mirror = 'http://mirror.peer1.net/debian';
+	my $mirror = 'http://debian.mirror.iweb.ca/debian';
 
 	my $packages = 'locales,dialog,libui-dialog-perl,'
 	. 'ifupdown,netbase,net-tools,iproute,inetutils-ping,'
@@ -124,10 +124,10 @@ EOF
 sub etc_sourceslist {
 	return <<EOF;
 deb http://it.mate1/debian                      squeeze main
-deb http://mirror.peer1.net/debian              squeeze main contrib non-free
-deb http://mirror.peer1.net/debian-security     squeeze/updates main
-deb http://mirror.peer1.net/debian              wheezy          main
-deb http://mirror.peer1.net/debian-security     wheezy/updates  main
+deb http://debian.mirror.iweb.ca/debian              squeeze main contrib non-free
+deb http://debian.mirror.iweb.ca/debian-security     squeeze/updates main
+deb http://debian.mirror.iweb.ca/debian              wheezy          main
+deb http://debian.mirror.iweb.ca/debian-security     wheezy/updates  main
 
 EOF
 }

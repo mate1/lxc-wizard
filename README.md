@@ -25,7 +25,7 @@ This uses debootstrap to install a base debian under /var/cache/lxc
     ibgdbm3 libgpm2 libgssapi-krb5-2 libk5crypto3 libkeyutils1 libkrb5-3 libkrb5support0 libncursesw5 libreadlin 
     e6 libssl0.9.8 libusb-0.1-4 libwrap0 openssh-blacklist openssh-client perl perl-modules procps readline-comm 
     on vim-common vim-runtime 
-    I: Checking component main on http://mirror.peer1.net/debian...
+    I: Checking component main on http://debian.mirror.iweb.ca/debian...
     I: Retrieving libacl1
     I: Validating libacl1
     I: Retrieving adduser
@@ -45,10 +45,10 @@ Upgrades your debian fs under /var/cache/lxc
     # lxc-wizard --REFRESH
 
     ** Container Creation Wizard **
-    Get:1 http://mirror.peer1.net squeeze Release.gpg [1672 B]
-    Get:2 http://mirror.peer1.net squeeze/updates Release.gpg [836 B]
-    Get:3 http://mirror.peer1.net wheezy Release.gpg [836 B]
-    Get:4 http://mirror.peer1.net wheezy/updates Release.gpg [836 B]
+    Get:1 http://debian.mirror.iweb.ca squeeze Release.gpg [1672 B]
+    Get:2 http://debian.mirror.iweb.ca squeeze/updates Release.gpg [836 B]
+    Get:3 http://debian.mirror.iweb.ca wheezy Release.gpg [836 B]
+    Get:4 http://debian.mirror.iweb.ca wheezy/updates Release.gpg [836 B]
     ...
     Fetched 9501 kB in 3s (2891 kB/s)
     Reading package lists... Done
