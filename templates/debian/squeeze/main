@@ -125,7 +125,7 @@ sub etc_sourceslist {
 	return <<EOF;
 deb http://it.mate1/debian                      squeeze main
 deb http://debian.mirror.iweb.ca/debian              squeeze main contrib non-free
-deb http://debian.mirror.iweb.ca/debian-security     squeeze/updates main
+deb http://debian.mirror.iweb.ca/debian-security     squeeze/updates main contrib non-free
 deb http://debian.mirror.iweb.ca/debian              wheezy          main
 deb http://debian.mirror.iweb.ca/debian-security     wheezy/updates  main
 
