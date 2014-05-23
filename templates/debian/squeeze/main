@@ -84,6 +84,12 @@ sub build_cache {
 	$rc += not system( "ln -s /dev/shm $cache/etc/network/run" );
 	checkrc( $rc );
 
+	print "Updating inittab config... ";
+	open  INITTAB, ">$cache/etc/inittab";
+	$rc = print INITTAB  etc_inittab();
+	close INITTAB;
+	checkrc( $rc );
+
 	print "Updating apt configs... ";
 	open  SOURCES, ">$cache/etc/apt/sources.list";
 	$rc = print SOURCES  etc_sourceslist();
@@ -117,7 +123,7 @@ l6:6:wait:/etc/init.d/rc 6
 # Normally not reached, but fallthrough in case of emergency.
 z6:6:respawn:/sbin/sulogin
 1:2345:respawn:/sbin/getty 38400 console
-c1:12345:respawn:/sbin/getty 38400 tty1 linux
+#c1:12345:respawn:/sbin/getty 38400 tty1 linux
 EOF
 }
 
