@@ -170,7 +170,6 @@ sub sshrun {
 	my ($ipaddr, $user, $p, $args) = @_;
 	my $profile = "/tmp/" . $$ . "-" . basename($p);
 
-	return;
 	system("scp $p $user$ipaddr:$profile");
 	system("ssh -t $user$ipaddr chmod +x $profile");
 	system("ssh -t $user$ipaddr $profile " . $args);
