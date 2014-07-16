@@ -35,8 +35,6 @@ our %Default = (
     CPU		=> 1024,
     IO		=> 1000,
     AUTOSTART	=> 'Y',
-    BUILD 	=> 'Y',
-    REFRESH	=> 'Y',
     LAUNCH	=> 'Y',
     CREATE	=> 'Y',
     GO		=> 'Y'
@@ -50,7 +48,7 @@ our( $postcreate );
 our( $template );
 
 my( $LVM, $MOUNT, $FSTAB, $CREATE );	 # Features to manage
-my( $confirm, $AUTO, $BUILD, $REFRESH ); # Local use only
+my( $confirm, $AUTO ); # Local use only
 
 GetOptions( 'help'		=> \$help,
 
@@ -87,9 +85,6 @@ GetOptions( 'help'		=> \$help,
 	    'LVM=s'		=> \$LVM,
 	    'FSTAB=s'		=> \$FSTAB,
 	    'CREATE=s'		=> \$CREATE,
-
-	    'BUILD'		=> \$BUILD,
-	    'REFRESH'		=> \$REFRESH,
 
 	    'AUTO'		=> \$AUTO,
 		  'dryrun'  => \$DRYRUN

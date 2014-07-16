@@ -55,7 +55,7 @@ sub build_cache {
 
 	my $partial = "$cache_base/partial-$distrib-$arch";
 
-	my $mirror = 'http://mirror.peer1.net/debian';
+	my $mirror = 'http://debian.mirror.iweb.ca/debian';
 
 	my $packages = 'locales,dialog,libui-dialog-perl,'
 	. 'ifupdown,netbase,net-tools,iproute,inetutils-ping,'
@@ -84,6 +84,30 @@ sub build_cache {
 	$rc += not system( "ln -s /dev/shm $cache/etc/network/run" );
 	checkrc( $rc );
 
+	print "Updating inittab config... ";
+	open  INITTAB, ">$cache/etc/inittab";
+	$rc = print INITTAB  etc_inittab();
+	close INITTAB;
+	checkrc( $rc );
+
+	open LOCALE, ">$cache/etc/locale.gen";
+	$rc = print LOCALE etc_locale_gen();
+	close LOCALE;
+	checkrc( $rc );
+	
+	print "Setting up locale...\n";
+	$rc =  not system( "chroot $cache /bin/bash -c 'locale-gen'" );
+	checkrc( $rc );
+	
+	open TZDATA, ">$cache/etc/timezone";
+	$rc = print TZDATA etc_tzdata();
+	close TZDATA;
+	checkrc( $rc );
+	
+	print "Setting up timezone...\n";
+	$rc =  not system( "chroot $cache /bin/bash -c 'dpkg-reconfigure -f noninteractive tzdata'" );
+	checkrc( $rc );
+	
 	print "Updating apt configs... ";
 	open  SOURCES, ">$cache/etc/apt/sources.list";
 	$rc = print SOURCES  etc_sourceslist();
@@ -117,17 +141,29 @@ l6:6:wait:/etc/init.d/rc 6
 # Normally not reached, but fallthrough in case of emergency.
 z6:6:respawn:/sbin/sulogin
 1:2345:respawn:/sbin/getty 38400 console
-c1:12345:respawn:/sbin/getty 38400 tty1 linux
+#c1:12345:respawn:/sbin/getty 38400 tty1 linux
+EOF
+}
+
+sub etc_locale_gen {
+	return <<EOF;
+en_US.UTF-8 UTF-8
+EOF
+}
+
+sub etc_tzdata {
+	return <<EOF;
+America/Montreal
 EOF
 }
 
 sub etc_sourceslist {
 	return <<EOF;
 deb http://it.mate1/debian                      squeeze main
-deb http://mirror.peer1.net/debian              squeeze main contrib non-free
-deb http://mirror.peer1.net/debian-security     squeeze/updates main
-deb http://mirror.peer1.net/debian              wheezy          main
-deb http://mirror.peer1.net/debian-security     wheezy/updates  main
+deb http://debian.mirror.iweb.ca/debian              squeeze main contrib non-free
+deb http://debian.mirror.iweb.ca/debian-security     squeeze/updates main contrib non-free
+deb http://debian.mirror.iweb.ca/debian              wheezy          main
+deb http://debian.mirror.iweb.ca/debian-security     wheezy/updates  main
 
 EOF
 }
