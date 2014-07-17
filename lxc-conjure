@@ -170,6 +170,15 @@ if ($create && $parallel) {
 	}
 }
 
+sub sshrun {
+	my ($ipaddr, $user, $p, $args) = @_;
+	my $profile = "/tmp/" . $$ . "-" . basename($p);
+
+	system("scp $p $user$ipaddr:$profile");
+	system("ssh -t $user$ipaddr chmod +x $profile");
+	system("ssh -t $user$ipaddr $profile " . $args);
+}
+
 sub hash_merge {
 	my ($dest, $source) = @_;
 	my $hash = dclone $dest;
@@ -283,10 +292,6 @@ sub wizard {
 	my $postcreate = "";
 	my $keys = "";
 
-	# copy over postcreate
-	$postcreate = "/tmp/" . $$ . "-" . basename($options->{profile});
-	system("scp $PROFILE_HOME/$options->{profile} $USER$conthost:$postcreate");
-
 	# handle ssh keys if any
 	if ($options->{key}) {
 	
@@ -364,17 +369,34 @@ EOF
 			# wait for container to come up
 			if ($options->{startsleep}) { sleep ($options->{startsleep}) }
 			else { sleep 30 };
-
+	
 			if ($options->{profile}) {
 
-				print("Running profile...\n");
+				print("Running profile(s)...\n");
+				
+				# profiles can be scalars, in which case
+				# we will take "--" as their args.
+				# they can also be arrays, and have no args,
+				# or they can be hashes, like this:
+				# profile -> profile args
+				my $r = ref($options->{profile});
 
-				my $profile = "/tmp/" . $$ . "-" . basename($options->{profile});
-				my $args = $options->{"--"} || "";
-
-				system("scp $PROFILE_HOME/$options->{profile} $USER$options->{ipaddr}:$profile");
-				system("ssh -t $USER$options->{ipaddr} chmod +x $profile");
-				system("ssh -t $USER$options->{ipaddr} $profile " . $args);
+				if ($r eq "ARRAY") {
+					for my $p (@{$options->{profile}}) {
+						my $NOARGS = "";
+						sshrun($options->{ipaddr}, $USER, "$PROFILE_HOME/$p", $NOARGS);
+					}
+				} elsif ($r eq "HASH") {
+					my $profiles = $options->{profile};
+					for my $p (keys %$profiles) {
+						my $args = $profiles->{$p};
+						sshrun($options->{ipaddr}, $USER, "$PROFILE_HOME/$p", $args);
+					}	
+				} elsif ($r eq "") {
+					my $p = $options->{profile};
+					my $args = $options->{"--"} || "";
+					sshrun($options->{ipaddr}, $USER, "$PROFILE_HOME/$p", $args);
+				}
 			}
 
 			if ($options->{deployscript}) {
