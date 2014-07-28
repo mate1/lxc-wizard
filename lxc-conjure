@@ -8,6 +8,7 @@ use File::Temp qw/ :POSIX /;
 use File::Slurp;
 use Getopt::Long;
 use Parallel::Runner;
+use Net::Ping;
 
 ############################################################
 #                                                          #
@@ -363,8 +364,15 @@ EOF
 		if ($options->{profile} || $options->{deployscript}) {
 
 			# wait for container to come up
-			if ($options->{startsleep}) { sleep ($options->{startsleep}) }
-			else { sleep 30 };
+			my $pingobj = Net::Ping->new("tcp");
+		        $pingobj->port_number(22);
+			while ( ! $pingobj->ping($options->{ipaddr}, 1) ) {
+			    print ($options->{ipaddr} . " unreachable, wait more time\n");
+			    sleep(2);
+			}
+
+#			if ($options->{startsleep}) { sleep ($options->{startsleep}) }
+#			else { sleep 30 };
 	
 			if ($options->{profile}) {
 
