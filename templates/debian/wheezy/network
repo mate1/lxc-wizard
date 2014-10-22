@@ -1,0 +1,25 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+my $ipaddr = shift;
+my $gwaddr = shift;
+my $rootfs = shift;
+
+my $cfg =<<EOF
+auto lo eth0
+
+iface lo inet loopback
+
+iface eth0 inet static
+	address $ipaddr
+	netmask 255.255.0.0
+	gateway $gwaddr
+EOF
+	;
+	
+open  INTERFACES, ">$rootfs/etc/network/interfaces";
+print INTERFACES  $cfg;
+close INTERFACES;
+

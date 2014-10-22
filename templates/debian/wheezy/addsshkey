@@ -1,0 +1,25 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use File::Path;
+
+my $user   = shift;
+my $key    = shift;
+my $rootfs = shift;
+
+# find user's info from /etc/passwd
+open my $passwd, "$rootfs/etc/passwd";
+my @info = grep /$user/, <$passwd>;
+close $passwd;
+
+if (@info && scalar @info > 0) {
+	
+	my ($login, $passwd, $uid, $gid, $gcos, $home, $shell) = split(/:/, $info[0]);
+
+	mkpath("$rootfs$home/.ssh");
+	system("cat $key >> $rootfs$home/.ssh/authorized_keys");
+	system("chown -R $uid:$gid $rootfs$home/.ssh");
+	system("chroot $rootfs /bin/bash -c 'chmod 0600 $home/.ssh/authorized_keys'");
+}
+

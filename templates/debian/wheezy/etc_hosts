@@ -1,0 +1,14 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+my $ipaddr   = shift;
+my $hostname = shift;
+my $fqdn     = shift;
+my $rootfs   = shift;
+
+open  HOST, ">>$rootfs/etc/hosts";		
+print HOST "$ipaddr\t$fqdn $hostname";
+close HOST;
+

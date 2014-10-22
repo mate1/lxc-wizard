@@ -348,6 +348,7 @@ sub wizard {
 	--container $options->{container} \\
 	--SWAP=$options->{SWAP} \\
 	--LVM=$options->{LVM} \\
+	--lvsize=$options->{LVSize} \\
 	--auto \\
 	--rootpass $options->{rootpass} \\
 	$users \\
