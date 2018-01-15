@@ -319,6 +319,10 @@ lxc.pivotdir = lxc_putold
 # uncomment the next line to run the container unconfined:
 #lxc.aa_profile = unconfined
 
+lxc.network.type = veth
+lxc.network.flags = up
+lxc.network.link = br0
+
 lxc.cgroup.devices.deny = a
 # Allow any mknod (but not using the node)
 lxc.cgroup.devices.allow = c *:* m
